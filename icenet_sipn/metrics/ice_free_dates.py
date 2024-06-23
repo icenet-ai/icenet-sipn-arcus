@@ -1,0 +1,197 @@
+import datetime as dt
+import numpy as np
+import matplotlib.pyplot as plt
+
+from functools import partial
+
+from icenet.data.sic.mask import Masks
+from ipywidgets import interact, IntSlider, SelectionSlider
+
+
+class IceFreeDatesFromSICMean:
+    """To compute/plot IFD from pre-computed SIC mean from ensemble outputs.
+    """
+    def compute_ice_free_dates_from_sic_mean(self, threshold=0.15, plot=True):
+        """Ice Free Dates.
+
+        The first day the SIC drops below 15% (IFD15).
+        """
+        xarr = self.xarr
+
+        data = xarr.sic_mean.isel(time=0)
+        mask_gen, land_mask = self.get_mask()
+        land_mask_nan = land_mask.astype(float)
+        land_mask_nan[land_mask] = np.nan
+        land_mask_nan[~land_mask] = 1.0
+
+        # Find the index of the first day where SIC hits the threshold
+        matches = ( data <= threshold ).argmax(dim="leadtime")*land_mask_nan
+
+        # ice_free_dates = np.full(matches.shape, np.nan)
+
+        # for lead_idx in xarr.leadtime.values:
+        #     idx = lead_idx - 1
+        #     ice_free_dates[matches.values == idx] = xarr.leadtime[idx]
+        
+        xarr["ice_free_dates"] = (("yc", "xc"), matches.data)
+        xarr["ice_free_dates"].attrs["description"] = "IFD15 calculated from sic_mean"
+
+        if plot:
+            # Identify first day of each month
+            dates = xarr.forecast_date.values.astype("datetime64[D]")
+
+            # Get array of unique months
+            unique_months = np.unique(dates.astype("datetime64[M]"))
+
+            # Include first day of the month
+            first_of_months = unique_months + np.timedelta64(0, "D")
+
+            img = xarr.ice_free_dates.plot.imshow()
+
+            # Customise colourbar
+            cbar = img.colorbar
+            cbar.set_label("")
+            tick_positions = [(date - dates[0]).astype(int) for date in first_of_months]
+            cbar.set_ticks(tick_positions)
+            cbar.set_ticklabels([date.astype(dt.datetime).strftime("%b %-d") for date in first_of_months])
+
+            # Hide x and y-axis labels
+            img.axes.xaxis.set_visible(False)
+            img.axes.yaxis.set_visible(False)
+
+            plt.title("Ice-Free Dates (IFD15)")
+
+        return xarr
+
+
+class IceFreeDatesFromSICEnsemble:
+    """To compute/plot IFD from individual ensemble member outputs
+    """
+    def __init__(self) -> None:
+        pass
+
+    @staticmethod
+    def plot_ice_free_dates_from_sic_ensemble(ifd_data, dates, index):
+        """Interactive plot of Ice-Free Dates 15% for all ensemble members.
+        """
+        # Identify first day of each month
+        dates = dates.astype("datetime64[D]")
+
+        # Get array of unique months
+        unique_months = np.unique(dates.astype("datetime64[M]"))
+
+        # Include first day of the month
+        first_of_months = unique_months + np.timedelta64(0, "D")
+
+        img = ifd_data[index].plot.imshow()
+
+        # Customise colourbar
+        cbar = img.colorbar
+        cbar.set_label("")
+        tick_positions = [(date - dates[0]).astype(int) for date in first_of_months]
+        cbar.set_ticks(tick_positions)
+        cbar.set_ticklabels([date.astype(dt.datetime).strftime("%b %-d") for date in first_of_months])
+
+        # Hide x and y-axis labels
+        img.axes.xaxis.set_visible(False)
+        img.axes.yaxis.set_visible(False)
+
+        title = f"Ice-Free Dates (IFD15) | Ensemble {index}"
+
+        plt.title(title)
+        plt.show()
+
+    @staticmethod
+    def plot_ice_free_dates_from_ensemble_mean_stddev(ifd_mean, ifd_stddev, dates):
+        """Ice-Free Dates 15% for an ensemble mean and corresponding standard deviation.
+        """
+        # Identify first day of each month
+        dates = dates.astype("datetime64[D]")
+
+        # Get array of unique months
+        unique_months = np.unique(dates.astype("datetime64[M]"))
+
+        # Include first day of the month
+        first_of_months = unique_months + np.timedelta64(0, "D")
+
+        img = ifd_mean.plot.imshow()
+
+        # Customise colourbar
+        cbar = img.colorbar
+        cbar.set_label("")
+        tick_positions = [(date - dates[0]).astype(int) for date in first_of_months]
+        cbar.set_ticks(tick_positions)
+        cbar.set_ticklabels([date.astype(dt.datetime).strftime("%b %-d") for date in first_of_months])
+
+        plt.title(f"Ice-Free Dates (IFD15) Mean")
+
+        # Hide x and y-axis labels
+        img.axes.xaxis.set_visible(False)
+        img.axes.yaxis.set_visible(False)
+
+        plt.show()
+
+        img = ifd_stddev.plot.imshow()
+
+        # Customise colourbar
+        cbar = img.colorbar
+        cbar.set_label("Days")
+
+        img.axes.xaxis.set_visible(False)
+        img.axes.yaxis.set_visible(False)
+
+        plt.title(f"Ice-Free Dates (IFD15) Standard Deviation")
+
+        plt.show()
+
+    def compute_ice_free_dates_for_single_sic(self, sic, dates=None, threshold=0.15, plot=False):
+        """Ice Free Dates for a single ensemble member or sic_mean.
+
+        The first day the SIC drops below 15% (IFD15).
+        """
+        land_mask = Masks(south=False, north=True).get_land_mask()
+        land_mask_nan = land_mask.astype(float)
+        land_mask_nan[land_mask] = np.nan
+        land_mask_nan[~land_mask] = 1.0
+
+        # Find the index of the first day where SIC hits the threshold
+        ice_free_dates = ( sic <= threshold ).argmax(dim="leadtime")*land_mask_nan
+
+        return ice_free_dates
+
+    def compute_ice_free_dates_from_sic_ensemble(self, threshold=0.15, plot=True):
+        """Ice Free Dates.
+
+        The first day the SIC drops below 15% (IFD15).
+        """
+        xarr = self.xarr
+        ensembles = list(range(xarr.ensemble_members.data))
+
+        kwargs = {"threshold": threshold, "plot": plot, "dates": xarr.forecast_date.values}
+        ice_free_dates_ensemble = np.asarray([xarr.sic.isel(time=0, ensemble=ensemble).map_blocks(self.compute_ice_free_dates_for_single_sic, kwargs=kwargs).values for ensemble in ensembles])
+        ice_free_dates_mean = ice_free_dates_ensemble.mean(axis=0)
+        ice_free_dates_stddev = ice_free_dates_ensemble.std(axis=0)
+
+        xarr["ice_free_dates"] = (("ensemble", "yc", "xc"), ice_free_dates_ensemble.data)
+        xarr["ice_free_dates"].attrs["description"] = "IFD15 per ensemble"
+        xarr["ice_free_dates_mean"] = (("yc", "xc"), ice_free_dates_mean.data)
+        xarr["ice_free_dates"].attrs["description"] = "Mean from ensemble IFD15 calculation"
+        xarr["ice_free_dates_stddev"] = (("yc", "xc"), ice_free_dates_stddev.data)
+        xarr["ice_free_dates"].attrs["description"] = "Standard Deviation from ensemble IFD15 calculation"
+
+        if plot:
+            # Plot IFD15 ensemble results
+            partial_plot_ice_free_dates = partial(self.plot_ice_free_dates_from_sic_ensemble, xarr["ice_free_dates"], xarr.forecast_date.values)
+
+            def wrapped_plot_func(index):
+                """Wrap partial plot func so that it has a __name__ for ipywidgets to work
+                with partial func call.
+                """
+                partial_plot_ice_free_dates(index)
+
+            interact(wrapped_plot_func, index=SelectionSlider(options=ensembles, value=ensembles[0], description="Ensemble"))
+
+            # Plot IFD15 mean and standard deviation results
+            self.plot_ice_free_dates_from_ensemble_mean_stddev(xarr["ice_free_dates_mean"], xarr["ice_free_dates_stddev"], xarr.forecast_date.values)
+
+        return xarr
