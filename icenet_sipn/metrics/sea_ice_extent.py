@@ -9,6 +9,19 @@ class SeaIceExtent:
     Refer here: https://www.arcus.org/sipn/sea-ice-outlook/2023/june
     """
 
+    def get_data(self):
+        return self.xarr
+
+    def clear_vars(self):
+        """Drop `ice free dates` related variables if previously saved in dataset.
+        """
+        self.xarr = self.xarr.drop_vars([
+            "sea_ice_extent_daily",
+            "sea_ice_extent_daily_mean",
+            "sea_ice_extent_monthly_mean",
+            "sea_ice_extent_daily_stddev",
+        ])
+
     def compute_sea_ice_extent(self, sea_ice_concentration, ensemble_axis=0, grid_cell_area=25*25,
                                 threshold=0.15, plot=False):
         """Compute Sea Ice Extent for an image for a given day.
@@ -19,6 +32,7 @@ class SeaIceExtent:
             ensemble_axis: Axis at which the ensemble members are stored.
                             Used to omit reduction operation across this axis.
         """
+        self.clear_vars()
         sic = sea_ice_concentration
         # print(sic.data.shape)
 
@@ -84,6 +98,9 @@ class SeaIceExtent:
                 )
             )
 
+        sea_ice_extent_daily_ds["sea_ice_extent_daily_mean"].attrs["long_name"] = "Total Sea-Ice Extent for each day"
+        sea_ice_extent_daily_ds["sea_ice_extent_daily_mean"].attrs["units"] = "10⁶ km²"
+
         return sea_ice_extent_daily_ds
 
     def compute_monthly_sea_ice_extent(self, method="mean", grid_cell_area=25*25, threshold=0.15, plot=False):
@@ -99,8 +116,7 @@ class SeaIceExtent:
         sea_ice_extent_monthly_ds = sea_ice_extent_daily_ds.sea_ice_extent_daily_mean.groupby(sea_ice_extent_daily_ds.day.dt.month).mean().rename("sea_ice_extent_monthly_mean")
 
         self.xarr["sea_ice_extent_monthly_mean"] = sea_ice_extent_monthly_ds
+        self.xarr["sea_ice_extent_monthly_mean"].attrs["long_name"] = "Total Sea-Ice Extent for each month, averaged from daily"
+        self.xarr["sea_ice_extent_monthly_mean"].attrs["units"] = "10⁶ km²"
 
         return sea_ice_extent_monthly_ds
-
-    def get_data(self):
-        return self.xarr
