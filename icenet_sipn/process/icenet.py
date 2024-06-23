@@ -100,7 +100,7 @@ class IceNetOutputPostProcess:
 
         # Create a dict with all variables to be stored in the xarray DataSet (incl. above ensemble results)
         data_vars=dict(
-            Lambert_Azimuthal_Grid=ds.Lambert_Azimuthal_Grid.data,
+            Lambert_Azimuthal_Grid=ds.Lambert_Azimuthal_Grid,
             sic_mean=(data_dims_list[1:], ds.sic_mean.data),
             sic_stddev=(data_dims_list[1:], ds.sic_stddev.data),
             ensemble_members=(ens_members),
@@ -127,13 +127,82 @@ class IceNetOutputPostProcess:
                 yc=ds.yc.data,
                 lat=(("yc", "xc"), ds.lat.data),
                 lon=(("yc", "xc"), longitude),
+            ),
+            attrs=dict(
+                Conventions="CF-1.6 ACDD-1.3",
+                creator_email="bryald@bas.ac.uk",
+                creator_institution="British Antarctic Survey",
+                creator_name="Bryn Noel Ubald",
+                creator_url="www.bas.ac.uk",
+                date_created=dt.datetime.now().strftime("%Y-%m-%d"),
+                geospatial_bounds_crs=ds.attrs["geospatial_bounds_crs"],
+                geospatial_lat_min=ds.attrs["geospatial_lat_min"],
+                geospatial_lat_max=ds.attrs["geospatial_lat_max"],
+                geospatial_lon_min=ds.attrs["geospatial_lon_min"],
+                geospatial_lon_max=ds.attrs["geospatial_lon_max"],
+                geospatial_vertical_min=0.0,
+                geospatial_vertical_max=0.0,
+                history="{} - creation".format(dt.datetime.now()),
+                id=f"{ds.attrs['id']}",
+                institution="British Antarctic Survey",
+                keywords=ds.attrs["keywords"],
+                keywords_vocabulary="GCMD Science Keywords",
+                license="Open Government Licence (OGL) V3",
+                naming_authority="uk.ac.bas",
+                platform="BAS HPC",
+                product_version=ds.attrs["product_version"],
+                project="IceNet",
+                publisher_institution="British Antarctic Survey",
+                source=ds.attrs["source"],
+                spatial_resolution=ds.attrs["spatial_resolution"],
+                # Values for any standard_name attribute must come from the CF
+                # Standard Names vocabulary for the data file or product to
+                #  comply with CF
+                standard_name_vocabulary=ds.attrs["standard_name_vocabulary"],
+                summary=ds.attrs["summary"],
+                # Use ISO 8601:2004 duration format, preferably the extended format
+                # as recommended in the Attribute Content Guidance section.
+                time_coverage_start=ds.attrs["time_coverage_start"],
+                time_coverage_end=ds.attrs["time_coverage_end"],
+                time_coverage_duration=ds.attrs["time_coverage_duration"],
+                time_coverage_resolution=ds.attrs["time_coverage_duration"],
+                title="Sea Ice Concentration Prediction",
             )
         )
+
+        xarr.time.attrs = ds.time.attrs
+        xarr.yc.attrs = ds.yc.attrs
+        xarr.xc.attrs = ds.xc.attrs
+        xarr.leadtime.attrs = ds.leadtime.attrs
+        xarr.lat.attrs = ds.lat.attrs
+        xarr.lon.attrs = ds.lon.attrs
+        xarr.sic_mean.attrs = ds.sic_mean.attrs
+        xarr.sic_stddev.attrs = ds.sic_stddev.attrs
+        xarr.ensemble_members.attrs = ds.ensemble_members.attrs
+        xarr.sic.attrs = dict(
+            long_name="sea ice area fraction across ensemble runs of icenet model",
+            standard_name="sea_ice_area_fraction",
+            short_name="sic",
+            valid_min=0,
+            valid_max=1,
+            ancillary_variables="sic_stddev",
+            grid_mapping="Lambert_Azimuthal_Grid",
+            units="1",
+        )
+        xarr.ensemble.attrs = dict(
+            long_name="id of ensemble runs",
+        )
+        xarr.forecast_date.attrs = dict(
+            long_name="array of forecast dates",
+        )
+
+        self.ds = ds
+
         if not date_index:
             self.xarr = xarr
         else:
             return xarr
-        
+
         ds.close()
 
     def save_data(self, output_path, reference="BAS_icenet"):
