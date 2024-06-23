@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
+from ..utils import drop_variables
+
 
 class SeaIceExtent:
     """Monthly Sea Ice Extent computation.
@@ -15,12 +17,13 @@ class SeaIceExtent:
     def clear_vars(self):
         """Drop `ice free dates` related variables if previously saved in dataset.
         """
-        self.xarr = self.xarr.drop_vars([
+        variable_names = [
             "sea_ice_extent_daily",
             "sea_ice_extent_daily_mean",
             "sea_ice_extent_monthly_mean",
             "sea_ice_extent_daily_stddev",
-        ])
+        ]
+        self.xarr = drop_variables(self.xarr, variable_names)
 
     def compute_sea_ice_extent(self, sea_ice_concentration, ensemble_axis=0, grid_cell_area=25*25,
                                 threshold=0.15, plot=False):
@@ -118,5 +121,6 @@ class SeaIceExtent:
         self.xarr["sea_ice_extent_monthly_mean"] = sea_ice_extent_monthly_ds
         self.xarr["sea_ice_extent_monthly_mean"].attrs["long_name"] = "Total Sea-Ice Extent for each month, averaged from daily"
         self.xarr["sea_ice_extent_monthly_mean"].attrs["units"] = "10⁶ km²"
+        self.xarr.month.attrs = {"long_name": "months for which mean sea ice extent are computed for"}
 
         return sea_ice_extent_monthly_ds

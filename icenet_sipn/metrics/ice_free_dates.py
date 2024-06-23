@@ -6,65 +6,9 @@ from functools import partial
 
 from icenet.data.sic.mask import Masks
 from ipywidgets import interact, IntSlider, SelectionSlider
+from ..utils import drop_variables
 
-
-class IceFreeDatesFromSICMean:
-    """To compute/plot IFD from pre-computed SIC mean from ensemble outputs.
-    """
-    def compute_ice_free_dates_from_sic_mean(self, threshold=0.15, plot=True):
-        """Ice Free Dates.
-
-        The first day the SIC drops below 15% (IFD15).
-        """
-        xarr = self.xarr
-
-        data = xarr.sic_mean.isel(time=0)
-        mask_gen, land_mask = self.get_mask()
-        land_mask_nan = land_mask.astype(float)
-        land_mask_nan[land_mask] = np.nan
-        land_mask_nan[~land_mask] = 1.0
-
-        # Find the index of the first day where SIC hits the threshold
-        matches = ( data <= threshold ).argmax(dim="leadtime")*land_mask_nan
-
-        # ice_free_dates = np.full(matches.shape, np.nan)
-
-        # for lead_idx in xarr.leadtime.values:
-        #     idx = lead_idx - 1
-        #     ice_free_dates[matches.values == idx] = xarr.leadtime[idx]
-        
-        xarr["ice_free_dates"] = (("yc", "xc"), matches.data)
-        xarr["ice_free_dates"].attrs["long_name"] = "IFD15 calculated from sic_mean"
-
-        if plot:
-            # Identify first day of each month
-            dates = xarr.forecast_date.values.astype("datetime64[D]")
-
-            # Get array of unique months
-            unique_months = np.unique(dates.astype("datetime64[M]"))
-
-            # Include first day of the month
-            first_of_months = unique_months + np.timedelta64(0, "D")
-
-            img = xarr.ice_free_dates.plot.imshow()
-
-            # Customise colourbar
-            cbar = img.colorbar
-            cbar.set_label("")
-            tick_positions = [(date - dates[0]).astype(int) for date in first_of_months]
-            cbar.set_ticks(tick_positions)
-            cbar.set_ticklabels([date.astype(dt.datetime).strftime("%b %-d") for date in first_of_months])
-
-            # Hide x and y-axis labels
-            img.axes.xaxis.set_visible(False)
-            img.axes.yaxis.set_visible(False)
-
-            plt.title("Ice-Free Dates (IFD15)")
-
-        return xarr
-
-
-class IceFreeDatesFromSICEnsemble:
+class IceFreeDates:
     """To compute/plot IFD from individual ensemble member outputs
     """
     def __init__(self) -> None:
@@ -73,11 +17,12 @@ class IceFreeDatesFromSICEnsemble:
     def clear_vars(self):
         """Drop `ice free dates` related variables if previously saved in dataset.
         """
-        self.xarr = self.xarr.drop_vars([
+        variable_names = [
             "ice_free_dates",
             "ice_free_dates_mean",
             "ice_free_dates_stddev",
-        ])
+        ]
+        self.xarr = drop_variables(self.xarr, variable_names)
 
     def plot_ice_free_dates_from_sic_mean(self, ifd_data):
         # Identify first day of each month
@@ -202,7 +147,7 @@ class IceFreeDatesFromSICEnsemble:
         ice_free_dates = self.compute_ice_free_dates_for_single_sic(sic)
 
         self.xarr["ice_free_dates"] = (("yc", "xc"), ice_free_dates.data)
-        self.xarr["ice_free_dates"].attrs["long_name"] = "Ice-Free Dates with 15\% threshold from SIC mean"
+        self.xarr["ice_free_dates"].attrs["long_name"] = "Ice-Free Dates with 15% threshold from SIC mean"
 
         if plot:
             self.plot_ice_free_dates_from_sic_mean(ice_free_dates)
@@ -223,7 +168,7 @@ class IceFreeDatesFromSICEnsemble:
         ice_free_dates_stddev = ice_free_dates_ensemble.std(axis=0)
 
         xarr["ice_free_dates"] = (("ensemble", "yc", "xc"), ice_free_dates_ensemble.data)
-        xarr["ice_free_dates"].attrs["long_name"] = "Ice-Free Dates with 15\% (IFD15) threshold across each ensemble"
+        xarr["ice_free_dates"].attrs["long_name"] = "Ice-Free Dates with 15% (IFD15) threshold across each ensemble"
         xarr["ice_free_dates_mean"] = (("yc", "xc"), ice_free_dates_mean.data)
         xarr["ice_free_dates_mean"].attrs["long_name"] = "Mean from ensemble IFD15 calculation"
         xarr["ice_free_dates_stddev"] = (("yc", "xc"), ice_free_dates_stddev.data)

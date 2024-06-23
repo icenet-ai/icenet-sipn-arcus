@@ -2,13 +2,12 @@ import datetime as dt
 
 from ..process.icenet import IceNetOutputPostProcess
 from .sea_ice_extent import SeaIceExtent
-from .ice_free_dates import IceFreeDatesFromSICMean, IceFreeDatesFromSICEnsemble
+from .ice_free_dates import IceFreeDates
 
 
 class SIPNOutputs(IceNetOutputPostProcess,
                   SeaIceExtent,
-                  IceFreeDatesFromSICMean,
-                  IceFreeDatesFromSICEnsemble
+                  IceFreeDates,
                   ):
     """SIPN ARCUS Sea Ice Outlook Submission for IceNet (with daily averaging 
     up to 93 day leadtime)

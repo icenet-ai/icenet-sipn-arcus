@@ -7,5 +7,5 @@ __license__ = "MIT"
 __version__ = "0.0.1_dev"
 
 from .metrics.sea_ice_extent import SeaIceExtent
-from .metrics.ice_free_dates import IceFreeDatesFromSICMean, IceFreeDatesFromSICEnsemble
+from .metrics.ice_free_dates import IceFreeDates
 from .metrics.sipn_outputs import SIPNOutputs
