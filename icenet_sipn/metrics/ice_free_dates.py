@@ -28,6 +28,7 @@ class IceFreeDates:
         self.xarr = drop_variables(self.xarr, variable_names)
 
     def plot_ice_free_dates_from_sic_mean(self, ifd_data):
+        print(type(self.date), self.date)
         ifd = ifd_data - self.date.timetuple().tm_yday
 
         land_mask = Masks(south=False, north=True).get_land_mask()
@@ -155,12 +156,19 @@ class IceFreeDates:
 
         # plt.title("Ice-Free Dates (IFD15)")
 
-    @staticmethod
     def plot_ice_free_dates_from_sic_ensemble(ifd_data, dates, index):
         """Interactive plot of Ice-Free Dates 15% for all ensemble members.
         """
+
+
         # Identify first day of each month
         dates = dates.astype("datetime64[D]")
+
+        start_date = dt.datetime.strptime(str(dates[0]), "%Y-%m-%d")
+        ifd = ifd_data - start_date.timetuple().tm_yday
+        
+        land_mask = Masks(south=False, north=True).get_land_mask()
+        mask = xr.DataArray(~land_mask, coords=[ifd.coords["yc"], ifd_data.coords["xc"]])
 
         # Get array of unique months
         unique_months = np.unique(dates.astype("datetime64[M]"))
@@ -168,18 +176,33 @@ class IceFreeDates:
         # Include first day of the month
         first_of_months = unique_months + np.timedelta64(0, "D")
 
-        img = ifd_data[index].plot.imshow()
+        # Create a colourmap including out-of-range values
+        cmap = plt.get_cmap("viridis")
+        cmap.set_under("grey")
+        colours = cmap(np.linspace(0, 1, 258))
+        new_colours = np.vstack(([1, 1, 1, 0], [1, 1, 1, 0], colours, [0.5, 0.5, 0.5, 1]))
+        new_cmap = mcolors.ListedColormap(new_colours)
+
+        leadtimes = [day for day in range(len(dates))]
+        vmin=leadtimes[0]
+        vmax=leadtimes[-1]
+        boundaries = np.linspace(vmin, vmax, 259)
+        norm = mcolors.BoundaryNorm(boundaries, new_cmap.N)
+
+        img1 = mask.plot.imshow(levels=[0, 1], colors="Grey", alpha=0.2, add_colorbar=False)
+        img2 = ifd[index].plot.imshow(vmin=vmin, vmax=vmax, cmap=new_cmap, norm=norm, alpha=1.0,
+                                    add_labels=False)
 
         # Customise colourbar
-        cbar = img.colorbar
+        cbar = img2.colorbar
         cbar.set_label("")
         tick_positions = [(date - dates[0]).astype(int) for date in first_of_months]
         cbar.set_ticks(tick_positions)
         cbar.set_ticklabels([date.astype(dt.datetime).strftime("%b %-d") for date in first_of_months])
 
         # Hide x and y-axis labels
-        img.axes.xaxis.set_visible(False)
-        img.axes.yaxis.set_visible(False)
+        img2.axes.xaxis.set_visible(False)
+        img2.axes.yaxis.set_visible(False)
 
         title = f"Ice-Free Dates (IFD15) | Ensemble {index}"
 
