@@ -53,14 +53,18 @@ class IceFreeDates:
         # Create a colourmap including out-of-range values
         cmap = plt.get_cmap("viridis")
         cmap.set_under("grey")
-        colours = cmap(np.linspace(0, 1, 258))
-        new_colours = np.vstack(([1, 1, 1, 0], [1, 1, 1, 0], colours, [0.5, 0.5, 0.5, 1]))
+        colours = cmap(np.linspace(0, 1, 257))
+        new_colours = np.vstack((
+            [1, 1, 1, 0],       # White for under colour-range
+            colours,            # Normal colourmap
+            [0.5, 0.5, 0.5, 1]  # Dark grey for over colour-range
+            ))
         new_cmap = mcolors.ListedColormap(new_colours)
 
         # Define new boundary for outside of vmax
         vmin=self.xarr.leadtime[0]
         vmax=self.xarr.leadtime[-1]
-        boundaries = np.linspace(vmin, vmax, 259)
+        boundaries = np.linspace(vmin, vmax, 257)
         norm = mcolors.BoundaryNorm(boundaries, new_cmap.N)
 
 
@@ -159,14 +163,12 @@ class IceFreeDates:
     def plot_ice_free_dates_from_sic_ensemble(ifd_data, dates, index):
         """Interactive plot of Ice-Free Dates 15% for all ensemble members.
         """
-
-
         # Identify first day of each month
         dates = dates.astype("datetime64[D]")
 
         start_date = dt.datetime.strptime(str(dates[0]), "%Y-%m-%d")
         ifd = ifd_data - start_date.timetuple().tm_yday
-        
+
         land_mask = Masks(south=False, north=True).get_land_mask()
         mask = xr.DataArray(~land_mask, coords=[ifd.coords["yc"], ifd_data.coords["xc"]])
 
@@ -179,14 +181,18 @@ class IceFreeDates:
         # Create a colourmap including out-of-range values
         cmap = plt.get_cmap("viridis")
         cmap.set_under("grey")
-        colours = cmap(np.linspace(0, 1, 258))
-        new_colours = np.vstack(([1, 1, 1, 0], [1, 1, 1, 0], colours, [0.5, 0.5, 0.5, 1]))
+        colours = cmap(np.linspace(0, 1, 257))
+        new_colours = np.vstack((
+            [1, 1, 1, 0],       # White for under colour-range
+            colours,            # Normal colourmap
+            [0.5, 0.5, 0.5, 1]  # Dark grey for over colour-range
+            ))
         new_cmap = mcolors.ListedColormap(new_colours)
 
         leadtimes = [day for day in range(len(dates))]
         vmin=leadtimes[0]
         vmax=leadtimes[-1]
-        boundaries = np.linspace(vmin, vmax, 259)
+        boundaries = np.linspace(vmin, vmax, 257)
         norm = mcolors.BoundaryNorm(boundaries, new_cmap.N)
 
         img1 = mask.plot.imshow(levels=[0, 1], colors="Grey", alpha=0.2, add_colorbar=False)
