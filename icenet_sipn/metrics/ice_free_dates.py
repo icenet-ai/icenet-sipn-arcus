@@ -102,7 +102,7 @@ class IceFreeDates:
         ifd = ifd_data - start_date.timetuple().tm_yday
 
         land_mask = Masks(south=False, north=True).get_land_mask()
-        mask = xr.DataArray(~land_mask, coords=[ifd.coords["yc"], ifd_data.coords["xc"]])
+        mask = xr.DataArray(~land_mask, coords=[ifd.coords["yc"], ifd.coords["xc"]])
 
         # Get array of unique months
         unique_months = np.unique(dates.astype("datetime64[M]"))
@@ -154,16 +154,41 @@ class IceFreeDates:
         # Identify first day of each month
         dates = dates.astype("datetime64[D]")
 
+        start_date = dt.datetime.strptime(str(dates[0]), "%Y-%m-%d")
+        ifd = ifd_mean - start_date.timetuple().tm_yday
+
+        land_mask = Masks(south=False, north=True).get_land_mask()
+        mask = xr.DataArray(~land_mask, coords=[ifd.coords["yc"], ifd.coords["xc"]])
+
         # Get array of unique months
         unique_months = np.unique(dates.astype("datetime64[M]"))
 
         # Include first day of the month
         first_of_months = unique_months + np.timedelta64(0, "D")
 
-        img = ifd_mean.plot.imshow()
+        # Create a colourmap including out-of-range values
+        cmap = plt.get_cmap("viridis")
+        cmap.set_under("grey")
+        colours = cmap(np.linspace(0, 1, 257))
+        new_colours = np.vstack((
+            [1, 1, 1, 0],       # White for under colour-range
+            colours,            # Normal colourmap
+            [0.5, 0.5, 0.5, 1]  # Dark grey for over colour-range
+            ))
+        new_cmap = mcolors.ListedColormap(new_colours)
+
+        leadtimes = [day for day in range(len(dates))]
+        vmin=leadtimes[0]
+        vmax=leadtimes[-1]
+        boundaries = np.linspace(vmin, vmax, 257)
+        norm = mcolors.BoundaryNorm(boundaries, new_cmap.N)
+
+        img1 = mask.plot.imshow(levels=[0, 1], colors="Grey", alpha=0.2, add_colorbar=False)
+        img2 = ifd.plot.imshow(vmin=vmin, vmax=vmax, cmap=new_cmap, norm=norm, alpha=1.0,
+                                    add_labels=False)
 
         # Customise colourbar
-        cbar = img.colorbar
+        cbar = img2.colorbar
         cbar.set_label("")
         tick_positions = [(date - dates[0]).astype(int) for date in first_of_months]
         cbar.set_ticks(tick_positions)
@@ -172,19 +197,22 @@ class IceFreeDates:
         plt.title(f"Ice-Free Dates (IFD15) Mean")
 
         # Hide x and y-axis labels
-        img.axes.xaxis.set_visible(False)
-        img.axes.yaxis.set_visible(False)
+        img2.axes.xaxis.set_visible(False)
+        img2.axes.yaxis.set_visible(False)
 
         plt.show()
 
-        img = ifd_stddev.plot.imshow()
+        img1 = mask.plot.imshow(levels=[0, 1], colors="Grey", alpha=0.2, add_colorbar=False)
+        img2 = ifd_stddev.plot.imshow(vmin=vmin, vmax=vmax, cmap=new_cmap, norm=norm, alpha=1.0,
+                                    add_labels=False)
 
         # Customise colourbar
-        cbar = img.colorbar
+        cbar = img2.colorbar
+        cbar.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         cbar.set_label("Days")
 
-        img.axes.xaxis.set_visible(False)
-        img.axes.yaxis.set_visible(False)
+        img2.axes.xaxis.set_visible(False)
+        img2.axes.yaxis.set_visible(False)
 
         plt.title(f"Ice-Free Dates (IFD15) Standard Deviation")
 
@@ -204,6 +232,8 @@ class IceFreeDates:
 
         threshold_never_met = (( sic <= threshold ).sum(dim="leadtime") == 0)
 
+        # Push areas where the threshold is never met to above upper range of leadtime
+        # Doing this so that plot will show the colour set in colourbar's upper.
         ice_free_dates = ice_free_dates.where(~threshold_never_met, other=100)*land_mask_nan#*start_mask.data#*end_mask.data
 
         # Add number of days since start of the year
