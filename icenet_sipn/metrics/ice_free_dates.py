@@ -28,7 +28,6 @@ class IceFreeDates:
         self.xarr = drop_variables(self.xarr, variable_names)
 
     def plot_ice_free_dates_from_sic_mean(self, ifd_data):
-        print(type(self.date), self.date)
         ifd = ifd_data - self.date.timetuple().tm_yday
 
         land_mask = Masks(south=False, north=True).get_land_mask()
@@ -301,10 +300,8 @@ class IceFreeDates:
         self.clear_vars()
 
         if method == "mean":
-            print("Method mean")
             ice_free_dates = self.compute_ice_free_dates_from_sic_mean(plot=plot)
         elif method == "ensemble":
-            print("Method ensemble")
             ice_free_dates = self.compute_ice_free_dates_from_sic_ensemble(plot=plot)
 
         return ice_free_dates
