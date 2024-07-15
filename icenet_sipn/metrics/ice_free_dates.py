@@ -17,7 +17,7 @@ class IceFreeDates:
     def __init__(self) -> None:
         pass
 
-    def clear_vars(self):
+    def clear_ifd(self):
         """Drop `ice free dates` related variables if previously saved in dataset.
         """
         variable_names = [
@@ -297,7 +297,7 @@ class IceFreeDates:
         The first day the SIC drops below 15% (IFD15).
         """
 
-        self.clear_vars()
+        self.clear_ifd()
 
         if method == "mean":
             ice_free_dates = self.compute_ice_free_dates_from_sic_mean(plot=plot)
