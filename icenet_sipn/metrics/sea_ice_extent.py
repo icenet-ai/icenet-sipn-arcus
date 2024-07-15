@@ -1,3 +1,5 @@
+from abc import ABC
+import datetime
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -5,7 +7,7 @@ import xarray as xr
 from ..utils import drop_variables
 
 
-class SeaIceExtent:
+class SeaIceExtent(ABC):
     """Monthly Sea Ice Extent computation.
     
     Refer here: https://www.arcus.org/sipn/sea-ice-outlook/2023/june
@@ -53,6 +55,8 @@ class SeaIceExtent:
             valid_axes = tuple(i for i in range(len(sic.shape)))
         elif len(sic.shape) == 4:
             valid_axes = tuple(i for i in range(len(sic.shape)) if i != ensemble_axis)
+        else:
+            raise ("Unexpected leading SIC dimension:", sic.shape)
 
         # Divide by 10^6 to get:
         # (units in 10^6 km^2)
@@ -66,16 +70,23 @@ class SeaIceExtent:
 
         Computes the total extent (SIC>15%) for each day.
         """
-        if method == "mean":
+        if method.casefold() == "mean":
             sic = self.xarr.sic_mean
-        elif method == "ensemble":
+        elif method.casefold() == "ensemble":
             sic = self.xarr.sic
+        elif method.casefold() == "observation":
+            sic = self.obs
+            sic = sic.rename({"time": "leadtime"})
+            # Rearrange to have leadtime as last dimension like icenet.
+            sic = sic.transpose("yc", "xc", "leadtime")
+            # Add extra dimension to emulate having forecast time in icenet.
+            sic = sic.expand_dims(new_dim=[0])
 
         kwargs = {"grid_cell_area": grid_cell_area, "threshold": threshold, "plot": plot}
         sea_ice_extent_daily = np.asarray([sic.isel(leadtime=day-1).map_blocks(self.compute_sea_ice_extent, kwargs=kwargs).values for day in self.xarr.leadtime]);
         forecast_dates = pd.to_datetime(self.xarr.forecast_date)
 
-        if method == "mean":
+        if method == "mean" or method == "observation":
             sea_ice_extent_daily_ds = xr.Dataset(
                 data_vars=dict(
                     sea_ice_extent_daily_mean = (["day"], sea_ice_extent_daily),
