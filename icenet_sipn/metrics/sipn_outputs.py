@@ -1,4 +1,7 @@
 import datetime as dt
+import pandas as pd
+
+from icenet.plotting.utils import get_obs_da
 
 from ..process.icenet import IceNetOutputPostProcess
 from .sea_ice_extent import SeaIceExtent
@@ -31,6 +34,13 @@ class SIPNOutputs(IceNetOutputPostProcess,
 
         super().__init__(prediction_path, date)
         self.create_ensemble_dataset()
+
+        # Get Observational data, if it exists.
+        self.obs = get_obs_da(
+            self.hemisphere,
+            pd.to_datetime(date) + dt.timedelta(days=1),
+            pd.to_datetime(date) +
+            dt.timedelta(days=int(self.xarr.leadtime.values.max())))
 
 
     def check_forecast_period(self):
