@@ -14,8 +14,8 @@ class SeaIceExtent:
     def get_data(self):
         return self.xarr
 
-    def clear_vars(self):
-        """Drop `ice free dates` related variables if previously saved in dataset.
+    def clear_sie(self):
+        """Drop `sea ice extent` related variables if previously saved in dataset.
         """
         variable_names = [
             "sea_ice_extent_daily",
@@ -35,7 +35,7 @@ class SeaIceExtent:
             ensemble_axis: Axis at which the ensemble members are stored.
                             Used to omit reduction operation across this axis.
         """
-        self.clear_vars()
+        self.clear_sie()
         sic = sea_ice_concentration
         # print(sic.data.shape)
 
