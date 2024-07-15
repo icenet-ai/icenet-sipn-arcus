@@ -1,6 +1,7 @@
 import logging
 import os
 
+from abc import ABC
 from glob import glob
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from icenet.plotting.video import xarray_to_video as xvid
 from icenet.data.sic.mask import Masks
 
 
-class IceNetOutputPostProcess:
+class IceNetOutputPostProcess(ABC):
     def __init__(self, prediction_path, date: dt.date) -> None:
         self.prediction_path = prediction_path
         self.date = date
@@ -26,6 +27,16 @@ class IceNetOutputPostProcess:
             return "south"
         else:
             raise Exception("Hemisphere not specified!")
+
+    @property
+    def get_pole(self):
+        if self.north:
+            return 1
+        elif self.south:
+            return -1
+        else:
+            raise Exception("Hemisphere not specified!")
+
 
     def get_mask(self):
         mask_gen = Masks(south=self.south, north=self.north)
@@ -99,11 +110,17 @@ class IceNetOutputPostProcess:
 
         sic_data.keys()
 
+        sic_mean = ds.sic_mean.data
+        logging.info("SIC Mean shape: ", sic_mean.shape, "Grid Cell Mask Shape: ", grid_cell_mask.shape)
+        # sic_mean[:, ~grid_cell_mask, ...] = np.nan
+        sic_stddev = ds.sic_stddev.data
+        # sic_stddev[:, ~grid_cell_mask, ...] = np.nan
+
         # Create a dict with all variables to be stored in the xarray DataSet (incl. above ensemble results)
         data_vars=dict(
             Lambert_Azimuthal_Grid=ds.Lambert_Azimuthal_Grid,
-            sic_mean=(data_dims_list[1:], ds.sic_mean.data),
-            sic_stddev=(data_dims_list[1:], ds.sic_stddev.data),
+            sic_mean=(data_dims_list[1:], sic_mean),
+            sic_stddev=(data_dims_list[1:], sic_stddev),
             ensemble_members=(ens_members),
         )
 
@@ -248,5 +265,5 @@ class IceNetOutputPostProcess:
         fc['time'] = [pd.to_datetime(forecast_date) \
                     + dt.timedelta(days=int(e)) for e in fc.time.values]
 
-        anim = xvid(fc, 15, figsize=4, mask=land_mask)
+        anim = xvid(fc, 15, figsize=(12, 12), mask=land_mask, pole=self.get_pole, coastlines=False)
         return anim

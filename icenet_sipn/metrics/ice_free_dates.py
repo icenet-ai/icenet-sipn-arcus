@@ -1,17 +1,21 @@
 import datetime as dt
+
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
-from matplotlib.ticker import MaxNLocator
 import xarray as xr
 
+from abc import ABC
 from functools import partial
 
+from matplotlib.ticker import MaxNLocator
 from icenet.data.sic.mask import Masks
 from ipywidgets import interact, IntSlider, SelectionSlider
 from ..utils import drop_variables
 
-class IceFreeDates:
+class IceFreeDates(ABC):
     """To compute/plot IFD from individual ensemble member outputs
     """
     def __init__(self) -> None:
@@ -27,7 +31,8 @@ class IceFreeDates:
         ]
         self.xarr = drop_variables(self.xarr, variable_names)
 
-    def plot_ice_free_dates_from_sic_mean(self, ifd_data):
+    def plot_ice_free_dates_from_sic_mean(self, ifd_data, figsize=(8, 8)):
+        pole = self.get_pole
         ifd = ifd_data - self.date.timetuple().tm_yday
 
         land_mask = Masks(south=False, north=True).get_land_mask()
@@ -66,12 +71,25 @@ class IceFreeDates:
         boundaries = np.linspace(vmin, vmax, 257)
         norm = mcolors.BoundaryNorm(boundaries, new_cmap.N)
 
+        source_crs = ccrs.LambertAzimuthalEqualArea(central_latitude=pole*90, central_longitude=0)
+        target_crs = ccrs.PlateCarree()
+        fig, ax = plt.subplots(figsize=figsize,
+                               subplot_kw={"projection": source_crs},
+                               layout="tight",
+                               )
 
-        fig, ax = plt.subplots()
+        img2 = ifd.plot.pcolormesh("lon", "lat",
+                                   vmin=vmin, vmax=vmax,
+                                   ax=ax,
+                                   cmap=new_cmap,
+                                   transform=target_crs,
+                                   norm=norm,
+                                   alpha=1.0,
+                                   add_labels=False,
+                                   )
 
-        img1 = mask.plot.imshow(levels=[0, 1], colors="Grey", alpha=0.2, add_colorbar=False)
-        img2 = ifd.plot.imshow(vmin=vmin, vmax=vmax, cmap=new_cmap, norm=norm, alpha=1.0,
-                                    add_labels=False)
+        ax.coastlines()
+        ax.add_feature(cfeature.LAND, facecolor="lightgrey")
 
         # Customise colourbar
         cbar = img2.colorbar
@@ -86,12 +104,12 @@ class IceFreeDates:
         img2.axes.yaxis.set_visible(False)
         # ax.axis("off")
 
-        fig.suptitle("Ice-Free Dates (IFD15)")
+        ax.set_title("Ice-Free Dates (IFD15)")
 
         plt.show()
 
 
-    def plot_ice_free_dates_from_sic_ensemble(ifd_data, dates, index):
+    def plot_ice_free_dates_from_sic_ensemble(self, ifd_data, dates, index):
         """Interactive plot of Ice-Free Dates 15% for all ensemble members.
         """
         # Identify first day of each month
@@ -246,8 +264,8 @@ class IceFreeDates:
         sic = self.xarr.sic_mean.isel(time=0)
         ice_free_dates = self.compute_ice_free_dates_for_single_sic(sic)
 
-        self.xarr["ice_free_dates"] = (("yc", "xc"), ice_free_dates.data)
-        self.xarr["ice_free_dates"].attrs["long_name"] = "Ice-Free Dates with 15% threshold from SIC mean"
+        self.xarr["ice_free_dates_15"] = (("yc", "xc"), ice_free_dates.data)
+        self.xarr["ice_free_dates_15"].attrs["long_name"] = "Ice-Free Dates with 15% threshold from SIC mean"
 
         if plot:
             self.plot_ice_free_dates_from_sic_mean(ice_free_dates)
@@ -267,12 +285,12 @@ class IceFreeDates:
         ice_free_dates_mean = ice_free_dates_ensemble.mean(axis=0)
         ice_free_dates_stddev = ice_free_dates_ensemble.std(axis=0)
 
-        xarr["ice_free_dates"] = (("ensemble", "yc", "xc"), ice_free_dates_ensemble.data)
-        xarr["ice_free_dates"].attrs["long_name"] = "Ice-Free Dates with 15% (IFD15) threshold across each ensemble"
-        xarr["ice_free_dates_mean"] = (("yc", "xc"), ice_free_dates_mean.data)
-        xarr["ice_free_dates_mean"].attrs["long_name"] = "Mean from ensemble IFD15 calculation"
-        xarr["ice_free_dates_stddev"] = (("yc", "xc"), ice_free_dates_stddev.data)
-        xarr["ice_free_dates_stddev"].attrs["long_name"] = "Standard Deviation from ensemble IFD15 calculation"
+        xarr["ice_free_dates_15"] = (("ensemble", "yc", "xc"), ice_free_dates_ensemble.data)
+        xarr["ice_free_dates_15"].attrs["long_name"] = "Ice-Free Dates with 15% (IFD15) threshold across each ensemble"
+        xarr["ice_free_dates_15_mean"] = (("yc", "xc"), ice_free_dates_mean.data)
+        xarr["ice_free_dates_15_mean"].attrs["long_name"] = "Mean from ensemble IFD15 calculation"
+        xarr["ice_free_dates_15_stddev"] = (("yc", "xc"), ice_free_dates_stddev.data)
+        xarr["ice_free_dates_15_stddev"].attrs["long_name"] = "Standard Deviation from ensemble IFD15 calculation"
 
         if plot:
             # Plot IFD15 ensemble results
