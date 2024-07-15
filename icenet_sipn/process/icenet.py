@@ -12,6 +12,7 @@ import xarray as xr
 from icenet.plotting.video import xarray_to_video as xvid
 from icenet.data.sic.mask import Masks
 
+
 class IceNetOutputPostProcess:
     def __init__(self, prediction_path, date: dt.date) -> None:
         self.prediction_path = prediction_path
@@ -205,21 +206,28 @@ class IceNetOutputPostProcess:
 
         ds.close()
 
-    def save_data(self, output_path, reference="BAS_icenet"):
+    def save_data(self, output_path, reference="BAS_icenet", drop_vars=None):
         output_path = os.path.join(output_path,
                                 "netcdf",
                                 f"{reference}_{self.get_hemisphere}.nc"
                                 )
 
         Path(os.path.dirname(output_path)).mkdir(parents=True, exist_ok=True)
+
+        if drop_vars is None:
+            xarr = self.xarr
+        else:
+            xarr = self.xarr.copy()
+            xarr = xarr.drop_vars(drop_vars)
         
         compression = dict(zlib=True, complevel=9)
-        vars_encoding = {var: compression for var in self.xarr.data_vars}
-        coords_encoding = {coord: compression for coord in self.xarr.coords}
+        vars_encoding = {var: compression for var in xarr.data_vars}
+        coords_encoding = {coord: compression for coord in xarr.coords}
 
-        self.xarr.to_netcdf(output_path,
+        xarr.to_netcdf(output_path,
                         encoding=vars_encoding | coords_encoding
                     )
+
 
     def get_data_date_indexed(self):
         """Get forecast Xarray Dataset with forecast dates set as index
