@@ -37,10 +37,9 @@ class SeaIceExtent:
         """
         self.clear_sie()
         sic = sea_ice_concentration
-        # print(sic.data.shape)
 
         # Mask values less than the threshold
-        sic = sic.where(sic>threshold)
+        sic = xr.where(cond=sic>threshold, x=1, y=0)
 
         if plot:
             xr.plot.imshow(sic.squeeze())
