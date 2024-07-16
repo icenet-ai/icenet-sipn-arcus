@@ -31,7 +31,7 @@ class IceFreeDates(ABC):
         ]
         self.xarr = drop_variables(self.xarr, variable_names)
 
-    def plot_ice_free_dates_from_sic_mean(self, ifd_data, figsize=(8, 8)):
+    def plot_ice_free_dates_from_sic_mean(self, ifd_data, threshold=0.15, figsize=(8, 8)):
         pole = self.get_pole
         ifd = ifd_data - self.date.timetuple().tm_yday
 
@@ -104,7 +104,7 @@ class IceFreeDates(ABC):
         img2.axes.yaxis.set_visible(False)
         # ax.axis("off")
 
-        ax.set_title("Ice-Free Dates (IFD15)")
+        ax.set_title(f"Ice-Free Dates (IFD{int(threshold*100)})")
 
         plt.show()
 
@@ -235,11 +235,24 @@ class IceFreeDates(ABC):
 
         plt.show()
 
-    def compute_ice_free_dates_for_single_sic(self, sic, dates=None, threshold=0.15, plot=False):
+    def compute_ice_free_dates_for_single_sic(self, sic, threshold=0.15):
         """Ice Free Dates for a single ensemble member or sic_mean.
 
-        The first day the SIC drops below 15% (IFD15).
+        The first day the SIC drops below `threshold` from mean SIC.
+
+        Args:
+            threshold (optional): Threshold of Sea Ice Concentration (ranges from 0 to 1) to compute IFD for.
+                Defaults to 0.15.
+
+        Returns:
+            ice_free_dates: xarray.DataArray field with the mean of ice_free_dates_ensemble.
+                Dimensions: [yc, xc]
+
+        Raises:
+            AssertionError: If `threshold` is not between 0 and 1 (exclusive).
         """
+        assert 0 < threshold < 1, f"threshold={threshold}, threshold must be between 0 and 1"
+
         land_mask = Masks(south=False, north=True).get_land_mask()
         land_mask_nan = land_mask.astype(float)
         land_mask_nan[land_mask] = np.nan
@@ -257,26 +270,60 @@ class IceFreeDates(ABC):
         return ice_free_dates + self.date.timetuple().tm_yday
 
     def compute_ice_free_dates_from_sic_mean(self, threshold=0.15, plot=True):
-        """Ice Free Dates for `sic_mean`.
+        """Ice Free Dates computed from `sic_mean`.
 
-        The first day the SIC drops below 15% (IFD15).
+        The first day the SIC drops below `threshold` from mean SIC.
+
+        Args:
+            threshold (optional): Threshold of Sea Ice Concentration (ranges from 0 to 1) to compute IFD for.
+                Defaults to 0.15.
+            plot (optional): Whether to generate a plot of the result.
+                Defaults to True.
+
+        Returns:
+            ice_free_dates: xarray.DataArray field with the mean of ice_free_dates_ensemble.
+                Dimensions: [yc, xc, leadtime]
+
+        Raises:
+            AssertionError: If `threshold` is not between 0 and 1 (exclusive).
         """
+        assert 0 < threshold < 1, f"threshold={threshold}, threshold must be between 0 and 1"
+
         sic = self.xarr.sic_mean.isel(time=0)
-        ice_free_dates = self.compute_ice_free_dates_for_single_sic(sic)
+        ice_free_dates = self.compute_ice_free_dates_for_single_sic(sic, threshold=threshold)
 
         self.xarr["ice_free_dates_15"] = (("yc", "xc"), ice_free_dates.data)
         self.xarr["ice_free_dates_15"].attrs["long_name"] = "Ice-Free Dates with 15% threshold from SIC mean"
 
         if plot:
-            self.plot_ice_free_dates_from_sic_mean(ice_free_dates)
+            self.plot_ice_free_dates_from_sic_mean(ice_free_dates, threshold=threshold)
 
         return ice_free_dates
 
     def compute_ice_free_dates_from_sic_ensemble(self, threshold=0.15, plot=True):
-        """Ice Free Dates across each ensemble members, then take mean.
+        """Ice Free Dates across each ensemble members, then take mean across the result.
 
-        The first day the SIC drops below 15% (IFD15).
+        The first day the SIC drops below `threshold` across all ensemble predictions.
+
+        Args:
+            threshold (optional): Threshold of Sea Ice Concentration (ranges from 0 to 1) to compute IFD for.
+                Defaults to 0.15.
+            plot (optional): Whether to generate a plot of the result.
+                Defaults to True.
+
+        Returns:
+            ice_free_dates_ensemble: xarray.DataArray field with Ice Free Dates for all ensemble members.
+                Dimensions: [ensemble, yc, xc, leadtime]
+            ice_free_dates_mean: xarray.DataArray field with the mean of ice_free_dates_ensemble.
+                Dimensions: [yc, xc, leadtime]
+            ice_free_dates_stddev: xarray.DataArray field with the std dev of ice_free_dates_ensemble.
+                Dimensions: [yc, xc, leadtime]
+
+        Raises:
+            AssertionError: If `threshold` is not between 0 and 1 (exclusive).
         """
+        assert 0 < threshold < 1, f"threshold={threshold}, threshold must be between 0 and 1"
+
         xarr = self.xarr
         ensembles = list(range(xarr.ensemble_members.data))
 
@@ -309,17 +356,36 @@ class IceFreeDates(ABC):
 
         return ice_free_dates_ensemble, ice_free_dates_mean, ice_free_dates_stddev
 
-    def compute_ice_free_dates_from_sic(self, method="mean", threshold=0.15, plot=True):
-        """Ice Free Dates.
+    def compute_ice_free_dates_from_sic(self, method: str="mean", threshold: float=0.15, plot: bool=True) -> object:
+        """Ice Free Dates (IFD) from Sea Ice Concentration (SIC) field.
 
-        The first day the SIC drops below 15% (IFD15).
+        The first day the SIC drops below a certain `threshold`.
+
+        Args:
+            method (optional): Approach to take in calculating metric. It must be `mean` or `ensemble`.
+                Defaults to `mean`.
+            threshold (optional): Threshold of Sea Ice Concentration (ranges from 0 to 1) to compute IFD for.
+                Defaults to 0.15.
+            plot (optional): Whether to generate a plot of the result.
+                Defaults to True.
+
+        Returns:
+            ice_free_dates: xarray.DataArray field with Ice Free Dates.
+
+        Raises:
+            AssertionError: If `threshold` is not between 0 and 1 (exclusive).
+            ValueError: If `method` is not `mean` or `ensemble`
         """
+
+        assert 0 < threshold < 1, f"threshold={threshold}, threshold must be between 0 and 1"
 
         self.clear_ifd()
 
         if method == "mean":
-            ice_free_dates = self.compute_ice_free_dates_from_sic_mean(plot=plot)
+            ice_free_dates = self.compute_ice_free_dates_from_sic_mean(plot=plot, threshold=threshold)
         elif method == "ensemble":
-            ice_free_dates = self.compute_ice_free_dates_from_sic_ensemble(plot=plot)
+            ice_free_dates = self.compute_ice_free_dates_from_sic_ensemble(plot=plot, threshold=threshold)
+        else:
+            raise ValueError("Expected `method` to be `mean` or `ensemble`")
 
         return ice_free_dates
