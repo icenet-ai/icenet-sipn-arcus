@@ -1,9 +1,6 @@
-import datetime as dt
-
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -11,9 +8,8 @@ import xarray as xr
 from abc import ABC
 from functools import partial
 
-from matplotlib.ticker import MaxNLocator
 from icenet.data.sic.mask import Masks
-from ipywidgets import interact, IntSlider, SelectionSlider
+from ipywidgets import interact, SelectionSlider
 
 class SeaIceProbability(ABC):
     """Sea Ice Probability (SIP)
@@ -21,7 +17,7 @@ class SeaIceProbability(ABC):
     The probability that Sea Ice Concentration is over a given threshold in each grid cell as part of an ensemble prediction.
     """
 
-    def plot_sea_ice_probability_for_single_leadtime(self, sip_data, index, aggregate="daily", figsize=(8, 8)):
+    def plot_sea_ice_probability_for_single_leadtime(self, sip_data, index, threshold=0.15, aggregate="daily", figsize=(8, 8)):
         pole = self.get_pole
 
         if aggregate == "daily":
@@ -50,11 +46,11 @@ class SeaIceProbability(ABC):
         ax.coastlines()
         # ax.add_feature(cfeature.LAND, zorder=100, facecolor="lightgrey")
 
-        ax.set_title(f"Sea-Ice Probability")
+        ax.set_title(f"{aggregate.capitalize()} Sea-Ice Probability {int(threshold*100)}%")
 
         plt.show()
 
-    def plot_sea_ice_probability(self, aggregate="daily"):
+    def plot_sea_ice_probability(self, threshold=0.15, aggregate="daily"):
         sip = self.xarr["sea_ice_probability"]
 
         partial_plot_sea_ice_probability = partial(self.plot_sea_ice_probability_for_single_leadtime, sip)
@@ -63,7 +59,7 @@ class SeaIceProbability(ABC):
             """Wrap partial plot func so that it has a __name__ for ipywidgets to work
             with partial func call.
             """
-            partial_plot_sea_ice_probability(index, aggregate=aggregate)
+            partial_plot_sea_ice_probability(index, threshold=threshold, aggregate=aggregate)
 
         sip = self.xarr["sea_ice_probability"]
         if aggregate == "daily":
@@ -94,14 +90,6 @@ class SeaIceProbability(ABC):
         """
         land_mask = Masks(south=self.south, north=self.north).get_land_mask()
 
-        # if aggregate == "daily":
-        #     sic = self.xarr.sic.isel(time=0)
-        # elif aggregate == "monthly":
-        #     forecast_dates = pd.to_datetime(self.xarr.forecast_date)
-        #     sic = sic.groupby(forecast_dates.dt.month).mean()
-        # else:
-        #     raise NotImplementedError
-
         forecast_dates = pd.to_datetime(self.xarr.forecast_date)
 
         sic_ds = xr.Dataset(
@@ -118,8 +106,6 @@ class SeaIceProbability(ABC):
             )
         )
 
-        # sic = self.xarr.sic
-        # print((sic.leadtime + self.date.timetuple().tm_yday))
         if aggregate == "monthly":
             sic_ds = sic_ds.groupby(sic_ds.day.dt.month).mean()#.rename({"month": "leadtime"})
 
@@ -135,25 +121,7 @@ class SeaIceProbability(ABC):
         sea_ice_probability = sea_ice_probability.where(land_mask[..., np.newaxis]==0, other=np.nan)
 
         self.xarr["sea_ice_probability"] = sea_ice_probability
-        print(sea_ice_probability.shape)
-        self.plot_sea_ice_probability(aggregate=aggregate)
 
+        self.plot_sea_ice_probability(threshold=threshold, aggregate=aggregate)
 
-
-        # # Shift the leading leadtime dimension to the last to match icenet output
-        # sic_data = np.moveaxis(sea_ice_probability.data, 0, -1)
-        # self.xarr["sea_ice_probability"] = (("yc", "xc", "leadtime"), sic_data)
-
-        # self.plot_sea_ice_probability()
-
-        # return sea_ice_probability
-
-
-        # sea_ice_probability = (sic >= threshold).astype(int).mean(axis=ensemble_axis)
-        # sea_ice_probability = sea_ice_probability.where(land_mask[..., np.newaxis]==0, other=np.nan)
-
-        # self.xarr["sea_ice_probability"] = (("yc", "xc", "leadtime"), sea_ice_probability.data)
-
-        # self.plot_sea_ice_probability()
-
-        # return sea_ice_probability
+        return sea_ice_probability
