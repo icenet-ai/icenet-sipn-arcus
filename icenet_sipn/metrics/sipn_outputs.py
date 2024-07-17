@@ -5,11 +5,13 @@ from icenet.plotting.utils import get_obs_da
 
 from ..process.icenet import IceNetOutputPostProcess
 from .sea_ice_extent import SeaIceExtent
+from .sea_ice_probability import SeaIceProbability
 from .ice_free_dates import IceFreeDates
 
 
 class SIPNOutputs(IceNetOutputPostProcess,
                   SeaIceExtent,
+                  SeaIceProbability,
                   IceFreeDates,
                   ):
     """SIPN ARCUS Sea Ice Outlook Submission for IceNet (with daily averaging 
