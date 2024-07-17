@@ -254,7 +254,7 @@ class IceFreeDates(ABC):
         """
         assert 0 < threshold < 1, f"threshold={threshold}, threshold must be between 0 and 1"
 
-        land_mask = Masks(south=False, north=True).get_land_mask()
+        land_mask = Masks(south=self.south, north=self.north).get_land_mask()
         land_mask_nan = land_mask.astype(float)
         land_mask_nan[land_mask] = np.nan
         land_mask_nan[~land_mask] = 1.0
