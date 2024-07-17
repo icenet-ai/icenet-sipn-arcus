@@ -2,9 +2,10 @@ import datetime as dt
 
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
+import numpy as np
+import pandas as pd
 import xarray as xr
 
 from abc import ABC
@@ -253,21 +254,60 @@ class IceFreeDates(ABC):
         """
         assert 0 < threshold < 1, f"threshold={threshold}, threshold must be between 0 and 1"
 
-        land_mask = Masks(south=False, north=True).get_land_mask()
-        land_mask_nan = land_mask.astype(float)
-        land_mask_nan[land_mask] = np.nan
-        land_mask_nan[~land_mask] = 1.0
+        # land_mask = Masks(south=False, north=True).get_land_mask()
+        # land_mask_nan = land_mask.astype(float)
+        # land_mask_nan[land_mask] = np.nan
+        # land_mask_nan[~land_mask] = 1.0
 
-        ice_free_dates = ( sic <= threshold ).argmax(dim="leadtime")*land_mask_nan#*start_mask.data#*end_mask.data
+        # ice_free_dates = ( sic <= threshold ).argmax(dim="leadtime")*land_mask_nan#*start_mask.data#*end_mask.data
+
+        # threshold_never_met = (( sic <= threshold ).sum(dim="leadtime") == 0)
+
+        # # Push areas where the threshold is never met to above upper range of leadtime
+        # # Doing this so that plot will show the colour set in colourbar's upper.
+        # ice_free_dates = ice_free_dates.where(~threshold_never_met, other=100)*land_mask_nan#*start_mask.data#*end_mask.data
+
+        # # Add number of days since start of the year
+        # return ice_free_dates + self.date.timetuple().tm_yday
+
+        ice_concentration = sic
+
+        # Create a DataArray to store the ice-free day of the year
+        ice_free_doy = xr.full_like(sic.isel(leadtime=0), np.nan, dtype=np.float32)
+
+        # Iterate over each location
+        for yc in range(ice_concentration.sizes['yc']):
+            for xc in range(ice_concentration.sizes['xc']):
+                # Extract time series for the current location
+                ice_series = ice_concentration.isel(yc=yc, xc=xc)
+
+                # Find the first time step where the ice concentration is below the threshold
+                below_threshold = ice_series < threshold
+                # Find the index of the first element where threshold is hit.
+                first_ice_free = below_threshold.argmax(dim='leadtime').item()
+
+                # Check if the ice concentration drops below the threshold at least once
+                if below_threshold.max().item():  # True if there is at least one True in below_threshold
+                    # Get the corresponding date
+                    ice_free_date = ice_series['leadtime'][first_ice_free].values.item()
+
+                    # Convert the date to day of year
+                    ice_free_doy.values[yc, xc] = ice_free_date + self.date.timetuple().tm_yday
 
         threshold_never_met = (( sic <= threshold ).sum(dim="leadtime") == 0)
+        ice_free_doy = ice_free_doy.where(~threshold_never_met, other=100)
 
-        # Push areas where the threshold is never met to above upper range of leadtime
-        # Doing this so that plot will show the colour set in colourbar's upper.
-        ice_free_dates = ice_free_dates.where(~threshold_never_met, other=100)*land_mask_nan#*start_mask.data#*end_mask.data
+        return ice_free_doy
 
-        # Add number of days since start of the year
-        return ice_free_dates + self.date.timetuple().tm_yday
+
+
+
+
+
+
+
+
+
 
     def compute_ice_free_dates_from_sic_mean(self, threshold=0.15, plot=True):
         """Ice Free Dates computed from `sic_mean`.
