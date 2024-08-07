@@ -32,19 +32,23 @@ class IceFreeDates(ABC):
         ]
         self.xarr = drop_variables(self.xarr, variable_names)
 
+    @staticmethod
+    def get_cmap(cmap="viridis"):
+        """Create a colourmap including out-of-range values"""
+        cmap = plt.get_cmap(cmap)
+        cmap.set_under("grey")
+        colours = cmap(np.linspace(0, 1, 257))
+        new_colours = np.vstack((
+            [1, 1, 1, 0],       # White for under colour-range
+            colours,            # Normal colourmap
+            [0.5, 0.5, 0.5, 1]  # Dark grey for over colour-range
+            ))
+        new_cmap = mcolors.ListedColormap(new_colours)
+        return new_cmap
+
     def plot_ice_free_dates_from_sic_mean(self, ifd_data, threshold=0.15, figsize=(8, 8)):
         pole = self.get_pole
         ifd = ifd_data - self.date.timetuple().tm_yday
-
-        land_mask = Masks(south=False, north=True).get_land_mask()
-        land_mask_nan = land_mask.astype(float)
-        land_mask_nan[~land_mask] = np.nan
-        land_mask_nan[land_mask] = 1.0
-        land_mask_nan = land_mask_nan.astype(bool)
-
-        mask = xr.DataArray(~land_mask, coords=[ifd.coords["yc"], ifd_data.coords["xc"]])
-
-        # ifd = ifd.where(mask == 0, other=100)
 
         # Identify first day of each month
         dates = self.xarr.forecast_date.values.astype("datetime64[D]")
@@ -55,16 +59,7 @@ class IceFreeDates(ABC):
         # Include first day of the month
         first_of_months = unique_months + np.timedelta64(0, "D")
 
-        # Create a colourmap including out-of-range values
-        cmap = plt.get_cmap("viridis")
-        cmap.set_under("grey")
-        colours = cmap(np.linspace(0, 1, 257))
-        new_colours = np.vstack((
-            [1, 1, 1, 0],       # White for under colour-range
-            colours,            # Normal colourmap
-            [0.5, 0.5, 0.5, 1]  # Dark grey for over colour-range
-            ))
-        new_cmap = mcolors.ListedColormap(new_colours)
+        new_cmap = self.get_cmap()
 
         # Define new boundary for outside of vmax
         vmin=self.xarr.leadtime[0]
@@ -100,11 +95,6 @@ class IceFreeDates(ABC):
         cbar.set_ticks(tick_positions)
         cbar.set_ticklabels([date.astype(dt.datetime).strftime("%b %-d") for date in first_of_months])
 
-        # Hide x and y-axis labels
-        img2.axes.xaxis.set_visible(False)
-        img2.axes.yaxis.set_visible(False)
-        # ax.axis("off")
-
         ax.set_title(f"Ice-Free Dates (IFD{int(threshold*100)})")
 
         plt.show()
@@ -128,16 +118,7 @@ class IceFreeDates(ABC):
         # Include first day of the month
         first_of_months = unique_months + np.timedelta64(0, "D")
 
-        # Create a colourmap including out-of-range values
-        cmap = plt.get_cmap("viridis")
-        cmap.set_under("grey")
-        colours = cmap(np.linspace(0, 1, 257))
-        new_colours = np.vstack((
-            [1, 1, 1, 0],       # White for under colour-range
-            colours,            # Normal colourmap
-            [0.5, 0.5, 0.5, 1]  # Dark grey for over colour-range
-            ))
-        new_cmap = mcolors.ListedColormap(new_colours)
+        new_cmap = self.get_cmap()
 
         leadtimes = [day for day in range(len(dates))]
         vmin=leadtimes[0]
@@ -156,17 +137,12 @@ class IceFreeDates(ABC):
         cbar.set_ticks(tick_positions)
         cbar.set_ticklabels([date.astype(dt.datetime).strftime("%b %-d") for date in first_of_months])
 
-        # Hide x and y-axis labels
-        img2.axes.xaxis.set_visible(False)
-        img2.axes.yaxis.set_visible(False)
-
         title = f"Ice-Free Dates (IFD15) | Ensemble {index}"
 
         plt.title(title)
         plt.show()
 
-    @staticmethod
-    def plot_ice_free_dates_from_ensemble_mean_stddev(ifd_mean, ifd_stddev, dates):
+    def plot_ice_free_dates_from_ensemble_mean_stddev(self, ifd_mean, ifd_stddev, dates):
         """Ice-Free Dates 15% for an ensemble mean and corresponding standard deviation.
         """
         # Identify first day of each month
@@ -184,16 +160,7 @@ class IceFreeDates(ABC):
         # Include first day of the month
         first_of_months = unique_months + np.timedelta64(0, "D")
 
-        # Create a colourmap including out-of-range values
-        cmap = plt.get_cmap("viridis")
-        cmap.set_under("grey")
-        colours = cmap(np.linspace(0, 1, 257))
-        new_colours = np.vstack((
-            [1, 1, 1, 0],       # White for under colour-range
-            colours,            # Normal colourmap
-            [0.5, 0.5, 0.5, 1]  # Dark grey for over colour-range
-            ))
-        new_cmap = mcolors.ListedColormap(new_colours)
+        new_cmap = self.get_cmap()
 
         leadtimes = [day for day in range(len(dates))]
         vmin=leadtimes[0]
@@ -214,10 +181,6 @@ class IceFreeDates(ABC):
 
         plt.title(f"Ice-Free Dates (IFD15) Mean")
 
-        # Hide x and y-axis labels
-        img2.axes.xaxis.set_visible(False)
-        img2.axes.yaxis.set_visible(False)
-
         plt.show()
 
         img1 = mask.plot.imshow(levels=[0, 1], colors="Grey", alpha=0.2, add_colorbar=False)
@@ -228,9 +191,6 @@ class IceFreeDates(ABC):
         cbar = img2.colorbar
         cbar.ax.yaxis.set_major_locator(MaxNLocator(integer=True))
         cbar.set_label("Days")
-
-        img2.axes.xaxis.set_visible(False)
-        img2.axes.yaxis.set_visible(False)
 
         plt.title(f"Ice-Free Dates (IFD15) Standard Deviation")
 
