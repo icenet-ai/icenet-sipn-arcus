@@ -245,14 +245,12 @@ class IceNetOutputPostProcess(ABC):
                         encoding=vars_encoding | coords_encoding
                     )
 
-
     def get_data_date_indexed(self):
         """Get forecast Xarray Dataset with forecast dates set as index
         instead of forecast index integers.
         """
         xarr = self.create_ensemble_dataset(date_index=True)
         return xarr
-
 
     def plot_ensemble_mean(self):
         """Plots the ensemble mean.
