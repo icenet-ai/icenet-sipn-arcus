@@ -19,7 +19,8 @@ class SIPNOutputs(IceNetOutputPostProcess,
     
     Refer here: https://www.arcus.org/sipn/sea-ice-outlook/2023/june
     """
-    def __init__(self, hemisphere: str, prediction_path: str, date: dt.date) -> None:
+    def __init__(self, hemisphere: str, prediction_pipeline_path: str,
+                 prediction_name: str, date: dt.date) -> None:
         """
         Args:
             prediction_path: Path to the numpy prediction outputs
@@ -34,7 +35,7 @@ class SIPNOutputs(IceNetOutputPostProcess,
         else:
             raise Exception("Incorrect hemisphere specified, should be `north` or `south`")
 
-        super().__init__(prediction_path, date)
+        super().__init__(prediction_pipeline_path, prediction_name, date)
         self.create_ensemble_dataset()
 
         # Get Observational data, if it exists.

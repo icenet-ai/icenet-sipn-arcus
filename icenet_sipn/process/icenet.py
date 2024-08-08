@@ -12,15 +12,25 @@ import xarray as xr
 
 from icenet.plotting.video import xarray_to_video as xvid
 from icenet.data.sic.mask import Masks
+from icenet.process.predict import get_prediction_data
 
 
 class IceNetOutputPostProcess(ABC):
-    def __init__(self, prediction_path, date: dt.date) -> None:
-        self.prediction_path = prediction_path
+    def __init__(self, prediction_pipeline_path: str,
+                 prediction_name: str, date: dt.date) -> None:
+        self.prediction_pipeline_path = prediction_pipeline_path
+        self.prediction_name = prediction_name
         self.date = date
+
 
     @property
     def get_hemisphere(self):
+        """
+        Return the hemisphere based on the attributes `north` and `south` of the IceNetOutputPostProcess class instance.
+        If `north` is True, return string: "north".
+        If `south` is True, return string: "south".
+        Otherwise, raise an Exception indicating that the hemisphere is not specified.
+        """
         if self.north:
             return "north"
         elif self.south:
@@ -28,8 +38,15 @@ class IceNetOutputPostProcess(ABC):
         else:
             raise Exception("Hemisphere not specified!")
 
+
     @property
     def get_pole(self):
+        """
+        Return the pole value based on the attributes 'north' and 'south' of the IceNetOutputPostProcess class instance.
+        If `north` is True, return 1.
+        If `south` is True, return -1.
+        Otherwise, raise an Exception indicating that the hemisphere is not specified.
+        """
         if self.north:
             return 1
         elif self.south:
@@ -39,38 +56,29 @@ class IceNetOutputPostProcess(ABC):
 
 
     def get_mask(self):
+        """
+        Generate the land mask using the Masks class instance with the specified parameters.
+        Returns the Masks class instance and the generated land mask.
+        """
         mask_gen = Masks(south=self.south, north=self.north)
         land_mask = mask_gen.get_land_mask()
         return mask_gen, land_mask
 
-    def get_prediction_data_nb(self) -> tuple:
-        """Read individual ensemble outputs of IceNet prediction.
-        Based on IceNet library v0.2.7.
-        
-        Ref:
-        https://github.com/icenet-ai/icenet/blob/cb1cb785808ba1138c0ed0f8f88208a144daa6ff/icenet/process/predict.py#L63-L89
+
+    def create_ensemble_dataset(self, date_index: bool = False):
         """
-        glob_str = os.path.join(self.prediction_path, "*",
-                                self.date.strftime("%Y_%m_%d.npy"))
+        Create an xarray Dataset with ensemble prediction data.
 
-        np_files = glob(glob_str)
-        if not len(np_files):
-            logging.warning("No files found")
-            return None
+        Args:
+            date_index: If True, set forecast dates as index; otherwise, use forecast index integers.
 
-        data = [np.load(f) for f in np_files]
-        data = np.array(data)
-        ens_members = data.shape[0]
+        Returns:
+            xarray.Dataset: Dataset containing ensemble prediction data.
+        """
 
-        logging.debug("Data read from disk: {} from: {}".format(
-            data.shape, np_files))
-
-        return np.stack([data.mean(axis=0), data.std(axis=0)],
-                        axis=-1).squeeze(), data, ens_members
-
-
-    def create_ensemble_dataset(self, date_index=False):
-        ds = xr.open_dataset(f"{self.prediction_path}.nc")
+        ensemble_netcdf_file = os.path.join(self.prediction_pipeline_path, "results",
+                                            "predict", self.prediction_name) + ".nc"
+        ds = xr.open_dataset(ensemble_netcdf_file)
 
         # Dimensions for all data being inserted into xarray
         if date_index:
@@ -87,7 +95,13 @@ class IceNetOutputPostProcess(ABC):
         land_mask_nan[land_mask] = np.nan
         land_mask_nan[~land_mask] = 1.0
 
-        arr, data, ens_members = self.get_prediction_data_nb()
+        # arr, data, ens_members = self.get_prediction_data_nb()
+        arr, data, ens_members = get_prediction_data(
+            root=self.prediction_pipeline_path,
+            name=self.prediction_name,
+            date=self.date,
+            return_ensemble_data=True,
+        )
         dates = pd.to_datetime(ds.forecast_date[0])
 
         # Apply 0.0 to inactive cell regions
@@ -223,6 +237,7 @@ class IceNetOutputPostProcess(ABC):
 
         ds.close()
 
+
     def save_data(self, output_path, reference="BAS_icenet", drop_vars=None):
         output_path = os.path.join(output_path,
                                 "netcdf",
@@ -245,12 +260,14 @@ class IceNetOutputPostProcess(ABC):
                         encoding=vars_encoding | coords_encoding
                     )
 
+
     def get_data_date_indexed(self):
         """Get forecast Xarray Dataset with forecast dates set as index
         instead of forecast index integers.
         """
         xarr = self.create_ensemble_dataset(date_index=True)
         return xarr
+
 
     def plot_ensemble_mean(self):
         """Plots the ensemble mean.
@@ -269,5 +286,5 @@ class IceNetOutputPostProcess(ABC):
         fc["xc"] = fc["xc"].data*1000
         fc["yc"] = fc["yc"].data*1000
 
-        anim = xvid(fc, 15, figsize=(12, 12), mask=land_mask, mask_type="contour", north=self.north, south=self.south, coastlines=False)
+        anim = xvid(fc, 15, figsize=(8, 8), mask=land_mask, mask_type="contour", north=self.north, south=self.south, coastlines=False)
         return anim
