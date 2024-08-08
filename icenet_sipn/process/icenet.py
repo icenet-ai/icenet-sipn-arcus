@@ -253,6 +253,7 @@ class IceNetOutputPostProcess(ABC):
         xarr = self.create_ensemble_dataset(date_index=True)
         return xarr
 
+
     def plot_ensemble_mean(self):
         """Plots the ensemble mean.
         """
@@ -265,5 +266,10 @@ class IceNetOutputPostProcess(ABC):
         fc['time'] = [pd.to_datetime(forecast_date) \
                     + dt.timedelta(days=int(e)) for e in fc.time.values]
 
-        anim = xvid(fc, 15, figsize=(12, 12), mask=land_mask, pole=self.get_pole, coastlines=False)
+        # Convert eastings and northings from kilometers to metres.
+        # Needed if coastlines is enabled in following `xvid`` call.
+        fc["xc"] = fc["xc"].data*1000
+        fc["yc"] = fc["yc"].data*1000
+
+        anim = xvid(fc, 15, figsize=(12, 12), mask=land_mask, mask_type="contour", north=self.north, south=self.south, coastlines=False)
         return anim
