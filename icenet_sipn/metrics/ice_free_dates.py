@@ -285,25 +285,26 @@ class IceFreeDates(ABC):
             AssertionError: If `threshold` is not between 0 and 1 (exclusive).
         """
         assert 0 < threshold < 1, f"threshold={threshold}, threshold must be between 0 and 1"
+        threshold_pct = int(threshold*100)
 
         xarr = self.xarr
-        ensembles = list(range(xarr.ensemble_members.data))
+        ensembles = list(range(xarr.ensemble_members[0].data))
 
-        kwargs = {"threshold": threshold, "plot": False, "dates": xarr.forecast_date.values}
+        kwargs = {"threshold": threshold}
         ice_free_dates_ensemble = np.asarray([xarr.sic.isel(time=0, ensemble=ensemble).map_blocks(self.compute_ice_free_dates_for_single_sic, kwargs=kwargs).values for ensemble in ensembles])
         ice_free_dates_mean = ice_free_dates_ensemble.mean(axis=0)
         ice_free_dates_stddev = ice_free_dates_ensemble.std(axis=0)
 
-        xarr["ice_free_dates_15"] = (("ensemble", "yc", "xc"), ice_free_dates_ensemble.data)
-        xarr["ice_free_dates_15"].attrs["long_name"] = "Ice-Free Dates with 15% (IFD15) threshold across each ensemble"
-        xarr["ice_free_dates_15_mean"] = (("yc", "xc"), ice_free_dates_mean.data)
-        xarr["ice_free_dates_15_mean"].attrs["long_name"] = "Mean from ensemble IFD15 calculation"
-        xarr["ice_free_dates_15_stddev"] = (("yc", "xc"), ice_free_dates_stddev.data)
-        xarr["ice_free_dates_15_stddev"].attrs["long_name"] = "Standard Deviation from ensemble IFD15 calculation"
+        xarr[f"ice_free_dates_{threshold_pct}"] = (("ensemble", "yc", "xc"), ice_free_dates_ensemble.data)
+        xarr[f"ice_free_dates_{threshold_pct}"].attrs["long_name"] = "Ice-Free Dates with 15% (IFD15) threshold across each ensemble"
+        xarr[f"ice_free_dates_{threshold_pct}_mean"] = (("yc", "xc"), ice_free_dates_mean.data)
+        xarr[f"ice_free_dates_{threshold_pct}_mean"].attrs["long_name"] = "Mean from ensemble IFD15 calculation"
+        xarr[f"ice_free_dates_{threshold_pct}_stddev"] = (("yc", "xc"), ice_free_dates_stddev.data)
+        xarr[f"ice_free_dates_{threshold_pct}_stddev"].attrs["long_name"] = "Standard Deviation from ensemble IFD15 calculation"
 
         if plot:
-            # Plot IFD15 ensemble results
-            partial_plot_ice_free_dates = partial(self.plot_ice_free_dates_from_sic_ensemble, xarr["ice_free_dates"], xarr.forecast_date.values)
+            # Plot IFD ensemble results
+            partial_plot_ice_free_dates = partial(self.plot_ice_free_dates_from_sic_ensemble, xarr[f"ice_free_dates_{threshold_pct}"], xarr.forecast_date[0].values)
 
             def wrapped_plot_func(index):
                 """Wrap partial plot func so that it has a __name__ for ipywidgets to work
@@ -314,7 +315,7 @@ class IceFreeDates(ABC):
             interact(wrapped_plot_func, index=SelectionSlider(options=ensembles, value=ensembles[0], description="Ensemble"))
 
             # Plot IFD15 mean and standard deviation results
-            self.plot_ice_free_dates_from_ensemble_mean_stddev(xarr["ice_free_dates_mean"], xarr["ice_free_dates_stddev"], xarr.forecast_date.values)
+            self.plot_ice_free_dates_from_ensemble_mean_stddev(xarr[f"ice_free_dates_{threshold_pct}_mean"], xarr[f"ice_free_dates_{threshold_pct}_stddev"], xarr.forecast_date[0].values)
 
         return ice_free_dates_ensemble, ice_free_dates_mean, ice_free_dates_stddev
 
