@@ -163,14 +163,14 @@ class SeaIceProbability(ABC):
         """
         land_mask = Masks(south=self.south, north=self.north).get_land_mask()
 
-        forecast_dates = pd.to_datetime(self.xarr.forecast_date)
+        forecast_dates = pd.to_datetime(self.xarr.forecast_date[0])
 
         sic_ds = xr.Dataset(
             data_vars=dict(
                 sic = (["ensemble", "yc", "xc", "day"], self.xarr.sic.isel(time=0).data)
             ),
             coords=dict(
-                ensemble=list(range(self.xarr.ensemble_members.data)),
+                ensemble=list(range(self.xarr.ensemble_members[0].data)),
                 xc=self.xarr.xc.data,
                 yc=self.xarr.yc.data,
                 lat=(("yc", "xc"), self.xarr.lat.data),

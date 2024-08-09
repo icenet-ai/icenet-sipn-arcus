@@ -51,7 +51,7 @@ class IceFreeDates(ABC):
         ifd = ifd_data - self.date.timetuple().tm_yday
 
         # Identify first day of each month
-        dates = self.xarr.forecast_date.values.astype("datetime64[D]")
+        dates = self.xarr.forecast_date[0].values.astype("datetime64[D]")
 
         # Get array of unique months
         unique_months = np.unique(dates.astype("datetime64[M]"))

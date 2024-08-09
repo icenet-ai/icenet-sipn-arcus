@@ -67,18 +67,20 @@ class IceNetOutputPostProcess(ABC):
 
     def create_ensemble_dataset(self, date_index: bool = False):
         """
-        Create an xarray Dataset with ensemble prediction data.
+        Create an xarray Dataset including ensemble prediction data based on netCDF
+        output by icenet.
 
         Args:
-            date_index: If True, set forecast dates as index; otherwise, use forecast index integers.
+            date_index: If True, set forecast dates as index; otherwise, use
+                forecast index integers.
 
         Returns:
             xarray.Dataset: Dataset containing ensemble prediction data.
         """
 
-        ensemble_netcdf_file = os.path.join(self.prediction_pipeline_path, "results",
+        icenet_output_netcdf_file = os.path.join(self.prediction_pipeline_path, "results",
                                             "predict", self.prediction_name) + ".nc"
-        ds = xr.open_dataset(ensemble_netcdf_file)
+        ds = xr.open_dataset(icenet_output_netcdf_file)
 
         # Dimensions for all data being inserted into xarray
         if date_index:
@@ -86,16 +88,12 @@ class IceNetOutputPostProcess(ABC):
         else:
             data_dims_list = ["ensemble", "time", "yc", "xc", "leadtime"]
 
-        # Dict to store all ensemble results (for creating an xarray)
-        sic_data = {}
-
         # Apply np.nan to land mask regions (emulating icenet output)
         mask_gen, land_mask = self.get_mask()
         land_mask_nan = land_mask.astype(float)
         land_mask_nan[land_mask] = np.nan
         land_mask_nan[~land_mask] = 1.0
 
-        # arr, data, ens_members = self.get_prediction_data_nb()
         arr, data, ens_members = get_prediction_data(
             root=self.prediction_pipeline_path,
             name=self.prediction_name,
@@ -119,114 +117,10 @@ class IceNetOutputPostProcess(ABC):
             for ensemble in range(ens_members):
                 data[ensemble, :, ~grid_cell_mask, i] = 0.0
 
-        # for ensemble in range(ens_members):
-        sic_data[f"sic"] = (data_dims_list, data*land_mask_nan[np.newaxis, np.newaxis, :, :, np.newaxis])
+        xarr = ds.copy()
 
-        sic_data.keys()
-
-        sic_mean = ds.sic_mean.data
-        logging.info("SIC Mean shape: ", sic_mean.shape, "Grid Cell Mask Shape: ", grid_cell_mask.shape)
-        # sic_mean[:, ~grid_cell_mask, ...] = np.nan
-        sic_stddev = ds.sic_stddev.data
-        # sic_stddev[:, ~grid_cell_mask, ...] = np.nan
-
-        # Create a dict with all variables to be stored in the xarray DataSet (incl. above ensemble results)
-        data_vars=dict(
-            Lambert_Azimuthal_Grid=ds.Lambert_Azimuthal_Grid,
-            sic_mean=(data_dims_list[1:], sic_mean),
-            sic_stddev=(data_dims_list[1:], sic_stddev),
-            ensemble_members=(ens_members),
-        )
-
-        data_vars.update(sic_data)
-
-        data_vars.keys()
-
-        # Update longitude range to be 0 to 360 instead of -180 to 180
-        # This would be for SIPN South submission, not SIPN Arcus.
-        longitude = ds.lon.data.copy()
-        ## longitude[longitude<0] += 360
-
-        # print(ds.time.data)
-        xarr = xr.Dataset(
-            data_vars=data_vars,
-            coords=dict(
-                ensemble=list(range(ens_members)),
-                time=[ds.time[0].data],
-                leadtime=ds.leadtime.data,
-                forecast_date=ds.forecast_date[0].data,
-                xc=ds.xc.data,
-                yc=ds.yc.data,
-                lat=(("yc", "xc"), ds.lat.data),
-                lon=(("yc", "xc"), longitude),
-            ),
-            attrs=dict(
-                Conventions="CF-1.6 ACDD-1.3",
-                creator_email="bryald@bas.ac.uk",
-                creator_institution="British Antarctic Survey",
-                creator_name="Bryn Noel Ubald",
-                creator_url="www.bas.ac.uk",
-                date_created=dt.datetime.now().strftime("%Y-%m-%d"),
-                geospatial_bounds_crs=ds.attrs["geospatial_bounds_crs"],
-                geospatial_lat_min=ds.attrs["geospatial_lat_min"],
-                geospatial_lat_max=ds.attrs["geospatial_lat_max"],
-                geospatial_lon_min=ds.attrs["geospatial_lon_min"],
-                geospatial_lon_max=ds.attrs["geospatial_lon_max"],
-                geospatial_vertical_min=0.0,
-                geospatial_vertical_max=0.0,
-                history="{} - creation".format(dt.datetime.now()),
-                id=f"{ds.attrs['id']}",
-                institution="British Antarctic Survey",
-                keywords=ds.attrs["keywords"],
-                keywords_vocabulary="GCMD Science Keywords",
-                license="Open Government Licence (OGL) V3",
-                naming_authority="uk.ac.bas",
-                platform="BAS HPC",
-                product_version=ds.attrs["product_version"],
-                project="IceNet",
-                publisher_institution="British Antarctic Survey",
-                source=ds.attrs["source"],
-                spatial_resolution=ds.attrs["spatial_resolution"],
-                # Values for any standard_name attribute must come from the CF
-                # Standard Names vocabulary for the data file or product to
-                #  comply with CF
-                standard_name_vocabulary=ds.attrs["standard_name_vocabulary"],
-                summary=ds.attrs["summary"],
-                # Use ISO 8601:2004 duration format, preferably the extended format
-                # as recommended in the Attribute Content Guidance section.
-                time_coverage_start=ds.attrs["time_coverage_start"],
-                time_coverage_end=ds.attrs["time_coverage_end"],
-                time_coverage_duration=ds.attrs["time_coverage_duration"],
-                time_coverage_resolution=ds.attrs["time_coverage_duration"],
-                title="Sea Ice Concentration Prediction",
-            )
-        )
-
-        xarr.time.attrs = ds.time.attrs
-        xarr.yc.attrs = ds.yc.attrs
-        xarr.xc.attrs = ds.xc.attrs
-        xarr.leadtime.attrs = ds.leadtime.attrs
-        xarr.lat.attrs = ds.lat.attrs
-        xarr.lon.attrs = ds.lon.attrs
-        xarr.sic_mean.attrs = ds.sic_mean.attrs
-        xarr.sic_stddev.attrs = ds.sic_stddev.attrs
-        xarr.ensemble_members.attrs = ds.ensemble_members.attrs
-        xarr.sic.attrs = dict(
-            long_name="sea ice area fraction across ensemble runs of icenet model",
-            standard_name="sea_ice_area_fraction",
-            short_name="sic",
-            valid_min=0,
-            valid_max=1,
-            ancillary_variables="sic_stddev",
-            grid_mapping="Lambert_Azimuthal_Grid",
-            units="1",
-        )
-        xarr.ensemble.attrs = dict(
-            long_name="id of ensemble runs",
-        )
-        xarr.forecast_date.attrs = dict(
-            long_name="array of forecast dates",
-        )
+        # Add full ensemble prediction data to the original icenet DataSet
+        xarr[f"sic"] = (data_dims_list, data*land_mask_nan[np.newaxis, np.newaxis, :, :, np.newaxis])
 
         self.ds = ds
 
@@ -250,7 +144,7 @@ class IceNetOutputPostProcess(ABC):
             xarr = self.xarr
         else:
             xarr = self.xarr.copy()
-            xarr = xarr.drop_vars(drop_vars)
+            xarr = xarr.drop_vars(drop_vars, errors="ignore")
         
         compression = dict(zlib=True, complevel=9)
         vars_encoding = {var: compression for var in xarr.data_vars}

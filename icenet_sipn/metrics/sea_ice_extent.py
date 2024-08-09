@@ -84,7 +84,7 @@ class SeaIceExtent(ABC):
 
         kwargs = {"grid_cell_area": grid_cell_area, "threshold": threshold, "plot": plot}
         sea_ice_extent_daily = np.asarray([sic.isel(leadtime=day-1).map_blocks(self.compute_sea_ice_extent, kwargs=kwargs).values for day in self.xarr.leadtime]);
-        forecast_dates = pd.to_datetime(self.xarr.forecast_date)
+        forecast_dates = pd.to_datetime(self.xarr.forecast_date[0])
 
         if method == "mean" or method == "observation":
             sea_ice_extent_daily_ds = xr.Dataset(
