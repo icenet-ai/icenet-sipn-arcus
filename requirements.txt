@@ -1,0 +1,2 @@
+git+https://github.com/icenet-ai/icenet@ea0265474cdc5520989b838ca690c0e6501e4fda
+jupyterlab
