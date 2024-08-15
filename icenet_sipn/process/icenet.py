@@ -94,6 +94,7 @@ class IceNetOutputPostProcess(ABC):
         land_mask_nan[land_mask] = np.nan
         land_mask_nan[~land_mask] = 1.0
 
+
         arr, data, ens_members = get_prediction_data(
             root=self.prediction_pipeline_path,
             name=self.prediction_name,
